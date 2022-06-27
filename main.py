@@ -69,16 +69,20 @@ async def send_weather(message: aiogram.types.Message):
     await bot.send_message(message.chat.id, repls.what_now[l], reply_markup=kb)
 
 
+@decs.handle_exception
+def get_request_text(q: str, is_forecast: bool, l: int):
+    text = f"https://api.weatherapi.com/v1/" \
+           f"{'forecast' if is_forecast else 'current'}.json?key={config.WEATHER_API_KEY}" \
+           f"&q={q}{'&days=2' if is_forecast else ''}&aqi=no&lang={('ru', 'en')[l]}"
+    return text
+
+
 @decs.a_handle_exception
 async def get_resp(user_id, text):
     l = lang[user_id]
     pat = "[+-]?([0-9]*[.])?[0-9]+"
-    if re.match(f"{pat},{pat}", text.replace(' ', '')):
-        resp = requests.get(
-            f"https://api.weatherapi.com/v1/"
-            f"{'current' if state[user_id] == 2 else 'forecast'}.json?key={config.WEATHER_API_KEY}"
-            f"&q={text}{'' if state[user_id] == 2 else '&days=2'}&aqi=no&lang={('ru', 'en')[l]}")
-    else:
+    q = text
+    if not re.match(f"{pat},{pat}", text.replace(' ', '')):
         r = requests.get(
             f"https://api.tomtom.com/search/2/geocode/{text}.json"
             f"?storeResult=false&view=Unified&key={config.PLACE_API_KEY}"
@@ -89,10 +93,7 @@ async def get_resp(user_id, text):
         pos = data[0]["position"]
         lat, lon = pos["lat"], pos["lon"]
         q = f"{lat},{lon}"
-        resp = requests.get(
-            f"https://api.weatherapi.com/v1/"
-            f"{'current' if state[user_id] == 2 else 'forecast'}.json?key={config.WEATHER_API_KEY}"
-            f"&q={q}{'' if state[user_id] == 2 else '&days=2'}&aqi=no&lang={('ru', 'en')[l]}")
+    resp = requests.get(get_request_text(q, (state[user_id] != 2), l))
     return resp
 
 
@@ -119,25 +120,21 @@ async def handle_request(user_id, m_text):
         await bot.send_message(user_id, common.unfinished_registration)
         return
     l = lang[user_id]
+    if state[user_id] == 0:
+        await bot.send_message(user_id, repls.use_weather[l])
+        return
+    data = await get_data(user_id, m_text)
+    if len(data) == 0:
+        return
     if state[user_id] == 2:
-        data = await get_data(user_id, m_text)
-        if len(data) == 0:
-            return
-        text = repls.current_weather_text[l].format(data['current']['temp_c'], data['current']['condition']['text'],
-                                                    data['current']['humidity'], data['current']['wind_kph'],
-                                                    data['current']['feelslike_c'])
-        await bot.send_message(user_id, text)
-        state[user_id] = 0
+        data = data['current']
     elif state[user_id] == 1:
-        data = await get_data(user_id, m_text)
-        if len(data) == 0:
-            return
-        data = data['forecast']
-        text = repls.forecast_text[l].format(data['forecastday'][1]['day']['avgtemp_c'],
-                                             data['forecastday'][1]['day']['condition']['text'],
-                                             data['forecastday'][1]['day']['avghumidity'])
-        await bot.send_message(user_id, text)
-        state[user_id] = 0
+        data = data["forecast"]["forecastday"][1]["hour"][11]
+    text = repls.current_weather_text[l].format(data['temp_c'], data['condition']['text'],
+                                                data['humidity'], data['wind_kph'],
+                                                data['feelslike_c'])
+    await bot.send_message(user_id, text)
+    state[user_id] = 0
 
 
 @decs.a_handle_exception

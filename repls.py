@@ -1,6 +1,7 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 finished_register = ("Отлично, язык установлен.", "Great, the language is set.")
+use_weather = ("Используйте команду /weather, чтобы узнать погоду", "Use the weather command to found out weather")
 send_loc = (
     "Отправьте ваше местоположение (город и страну) "
     "или нажмите на большую кнопку и отправьте свою геопозицию",
