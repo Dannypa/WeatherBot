@@ -33,7 +33,8 @@ def load_data():
 def save_data():
     to_save = {}
     for uid in state:
-        to_save[uid] = (state[uid], lang[uid])
+        if uid in lang:
+            to_save[uid] = (state[uid], lang[uid])
     with open("data.json", 'w') as f:
         json.dump(to_save, f)
 
@@ -166,7 +167,8 @@ async def forecast(c: aiogram.types.CallbackQuery):
     user_id = c.message.chat.id
     state[user_id] = 1 if c.data == "forecast" else 2
     cl = lang[user_id]
-    await bot.edit_message_reply_markup(user_id, c.message.message_id, None)
+    if c.message.reply_markup is not None:
+        await bot.edit_message_reply_markup(user_id, c.message.message_id, None)
     if c.message.chat.type == aiogram.types.ChatType.PRIVATE:
         await bot.send_message(user_id, repls.send_loc[cl], reply_markup=repls.loc_kb[cl])
     else:
